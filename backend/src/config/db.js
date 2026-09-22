@@ -100,11 +100,12 @@ export async function upsertToTable(table, rows, conflictColumns) {
     ...baseHeaders,
     Prefer: 'resolution=merge-duplicates',
   };
-  if (conflictColumns) {
-    headers['On-Conflict'] = conflictColumns.join(',');
-  }
 
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+  const conflictQuery = conflictColumns?.length
+    ? `?on_conflict=${encodeURIComponent(conflictColumns.join(','))}`
+    : '';
+
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}${conflictQuery}`, {
     method: 'POST',
     headers,
     body: JSON.stringify(rows),
