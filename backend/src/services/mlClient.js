@@ -28,11 +28,17 @@ export async function fetchPredictionFromML({ district, mandi, crop }) {
       signal: controller.signal,
     });
 
+    const result = await response.json().catch(() => null);
+
+    if (result && result.available === false) {
+      return result;
+    }
+
     if (!response.ok) {
       throw new Error(`ML service returned ${response.status}`);
     }
 
-    return await response.json();
+    return result;
   } catch (err) {
     if (err.name === 'AbortError') {
       return { available: false, message: 'ML service timed out' };

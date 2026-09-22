@@ -58,30 +58,57 @@ export function CropAnalysisPage() {
     };
   }, [districtId, mandiId, cropId, hasQuery]);
 
-  const stats = useMemo(() => {
-    if (records.length === 0) return null;
-    const prices = records
-      .map((r) => r.modalPrice)
-      .filter((p) => p != null);
-    if (prices.length === 0) return null;
-    const current = prices[prices.length - 1];
-    const first = prices[0];
-    const change = first !== 0 ? ((current - first) / first) * 100 : 0;
-    return {
-      current,
-      change,
-      highest: Math.max(...prices),
-      lowest: Math.min(...prices),
-      average: prices.reduce((a, b) => a + b, 0) / prices.length,
-    };
-  }, [records]);
 
-  const chartData = records.map((r) => ({
+const dailyRecords = useMemo(() => {
+  const grouped = new Map();
+
+  for (const record of records) {
+    if (record.modalPrice == null || !record.priceDate) continue;
+
+    const price = Number(record.modalPrice);
+    if (Number.isNaN(price)) continue;
+
+    if (!grouped.has(record.priceDate)) {
+      grouped.set(record.priceDate, []);
+    }
+
+    grouped.get(record.priceDate).push(price);
+  }
+
+  return Array.from(grouped.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([priceDate, prices]) => ({
+      priceDate,
+      modalPrice:
+        prices.reduce((sum, price) => sum + price, 0) / prices.length,
+    }));
+}, [records]);
+
+const stats = useMemo(() => {
+  if (dailyRecords.length === 0) return null;
+
+  const prices = dailyRecords.map((r) => r.modalPrice);
+
+  const current = prices[prices.length - 1];
+  const first = prices[0];
+  const change = first !== 0 ? ((current - first) / first) * 100 : 0;
+
+  return {
+    current,
+    change,
+    highest: Math.max(...prices),
+    lowest: Math.min(...prices),
+    average: prices.reduce((a, b) => a + b, 0) / prices.length,
+  };
+}, [dailyRecords]);
+
+const chartData = dailyRecords
+  .map((r) => ({
     date: formatDate(r.priceDate),
     price: r.modalPrice,
-  })).filter((point) => point.price != null);
+  }));
 
-  const last7 = chartData.slice(-7);
+const last7 = chartData.slice(-7);
   const crop = getCrop(cropId) ?? {
     name: records[0]?.cropName ?? cropId,
     nameMr: records[0]?.cropName ?? cropId,

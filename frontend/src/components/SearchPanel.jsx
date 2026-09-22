@@ -157,7 +157,7 @@ export function SearchPanel({
             type="date"
             className="input"
             value={date ?? ''}
-            max={new Date().toISOString().slice(0, 10)}
+            max={new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())}
             onChange={(e) => onDateChange?.(e.target.value)}
           />
         </div>

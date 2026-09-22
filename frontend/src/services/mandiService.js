@@ -1,4 +1,4 @@
-ï»¿import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { getDistrict, getMandi, getCrop, getMandisByDistrict, MANDIS, CROPS } from '@/data/vidarbha';
 
 const PAGE_SIZE = 1000;
@@ -11,6 +11,7 @@ const mapRow = (r) => ({
   cropId: r.crop_id,
   cropName: r.crop_name,
   variety: r.variety,
+  grade: r.grade,
   minPrice: r.min_price,
   maxPrice: r.max_price,
   modalPrice: r.modal_price,
@@ -37,6 +38,7 @@ const normalizeMandiKey = (value) => String(value ?? '')
   .replace(/\b(apmc|market committee|market|mandi)\b/g, '')
   .replace(/amrawati/g, 'amravati')
   .replace(/varud/g, 'warud')
+  .replace(/chikali/g, 'chikhli')
   .replace(/[^a-z0-9]+/g, '');
 
 const mandiKeysFor = (mandi) => ([
@@ -362,6 +364,7 @@ export async function fetchPriceHistory(
   days = 30,
 ) {
   if (!isSupabaseConfigured || !supabase) return [];
+
   const since = new Date();
   since.setDate(since.getDate() - days);
   const sinceStr = since.toISOString().slice(0, 10);
@@ -375,9 +378,26 @@ export async function fetchPriceHistory(
     ascending: true,
   });
 
-  return (data ?? []).map(mapRow);
-}
+  const logicalRows = new Map();
 
+  for (const row of data ?? []) {
+    const mapped = mapRow(row);
+
+    const key = [
+      normalizeMandiKey(mapped.mandiId),
+      mapped.priceDate,
+      mapped.cropId,
+      String(mapped.variety ?? '').trim().toLowerCase(),
+      String(mapped.grade ?? '').trim().toLowerCase(),
+    ].join('|');
+
+    if (!logicalRows.has(key)) {
+      logicalRows.set(key, mapped);
+    }
+  }
+
+  return Array.from(logicalRows.values());
+}
 export async function fetchComparisonForCrop(
   districtId,
   cropId,
@@ -409,19 +429,15 @@ export async function fetchComparisonForCrop(
 
 export function formatPrice(value) {
   const numeric = Number(value);
-  if (value == null || Number.isNaN(numeric)) return 'â€”';
-  return `â‚¹${Math.round(numeric).toLocaleString('en-IN')}`;
+  if (value == null || Number.isNaN(numeric)) return '—';
+  return `\u20B9${Math.round(numeric).toLocaleString('en-IN')}`;
 }
 
 export function formatDate(iso) {
-  if (!iso) return 'â€”';
+  if (!iso) return '—';
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return 'â€”';
+  if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 export { getDistrict, getMandi, getCrop };
-
-
-
-
