@@ -287,11 +287,33 @@ Deno.serve(async (req: Request) => {
       url.searchParams.set("offset", String(offset));
       url.searchParams.set("filters[state]", "Maharashtra");
 
-      const response = await fetch(url.toString());
+      let response: Response | null = null;
+      let lastError = "";
 
-      if (!response.ok) {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          response = await fetch(url.toString(), { signal: AbortSignal.timeout(5000) });
+
+          if (response.ok) {
+            break;
+          }
+
+          lastError = `data.gov.in API returned ${response.status}`;
+        } catch (error) {
+          lastError =
+            error instanceof Error ? error.message : "Network error";
+        }
+
+        if (attempt < 3) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, attempt * 3000),
+          );
+        }
+      }
+
+      if (!response || !response.ok) {
         throw new Error(
-          `data.gov.in API returned ${response.status}`,
+          `${lastError}. Failed after 3 attempts.`,
         );
       }
 
@@ -594,16 +616,23 @@ Deno.serve(async (req: Request) => {
         startedAt,
       }).catch(() => undefined);
     }
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Unknown error";
+
+    const isGovernmentSourceError =
+      errorMessage.includes("data.gov.in API returned") ||
+      errorMessage.includes("Failed after 3 attempts");
+
     return new Response(
       JSON.stringify({
         available: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unknown error",
+        error: errorMessage,
+        source_unavailable: isGovernmentSourceError,
       }),
       {
-        status: 500,
+        status: isGovernmentSourceError ? 503 : 500,
         headers: {
           ...corsHeaders,
           "Content-Type": "application/json",
@@ -612,3 +641,5 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
+
+
